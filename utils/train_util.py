@@ -1,3 +1,4 @@
+import os
 import time
 import numpy as np
 from tqdm import tqdm
@@ -11,7 +12,7 @@ from .model_util import ClassicNN, scDGN
 from .loss_util import ContrastiveLoss
 
 class BaseTrainer(object):
-    def __init__(self, d_dim, dim1, dim2, dim_label, num_epochs, batch_size, use_gpu, validation=True):
+    def __init__(self, d_dim, dim1, dim2, dim_label, num_epochs, batch_size, model_path, use_gpu, validation=True):
         super(BaseTrainer, self).__init__()
         self.dim1 = dim1
         self.dim2 = dim2
@@ -21,6 +22,7 @@ class BaseTrainer(object):
         self.batch_size = batch_size
         self.use_gpu = use_gpu
         self.validation = validation
+        self.out_path = model_path
         
     def initialize(self):
         for p in self.D.parameters():
@@ -28,6 +30,14 @@ class BaseTrainer(object):
                 nn.init.xavier_uniform(p)
             else:
                 nn.init.normal(p, 0, 1)
+
+    def load_model(self, model_file):
+        skpt_dict = torch.load(model_path)
+        self.D.load_state_dict(skpt_dict)
+
+    def save_model(self, model_file):
+        torch.save(self.D.state_dict(), model_file)
+
     def test(self):
         self.D.eval()
         counts = 0
@@ -40,12 +50,10 @@ class BaseTrainer(object):
             else:
                 X = Variable(torch.FloatTensor(x))
                 Y = Variable(torch.LongTensor(y))
-            outputs = self.D(X, X)
-            f_X = outputs[0]
+            f_X = self.D(X, mode='test')
             sum_acc += (f_X.max(dim=1)[1] == Y).float().sum().data.cpu().numpy()
             del X,Y,f_X
         test_acc = sum_acc/counts
-        print('Test Accuracy: {0:0.3f}'.format(test_acc))
         return test_acc
       
     def valid(self):
@@ -60,8 +68,7 @@ class BaseTrainer(object):
             else:
                 X = Variable(torch.FloatTensor(x))
                 Y = Variable(torch.LongTensor(y))
-            outputs = self.D(X, X)
-            f_X = outputs[0]
+            f_X = self.D(X, mode='test')
             sum_acc += (f_X.max(dim=1)[1] == Y).float().sum().data.cpu().numpy()
             del X,Y,f_X
         valid_acc = sum_acc/counts
@@ -69,8 +76,8 @@ class BaseTrainer(object):
         return valid_acc
 
 class ClassicTrainer(BaseTrainer):
-    def __init__(self, d_dim, dim1, dim2, dim_label, num_epochs, batch_size, use_gpu, validation=True):
-        super(ClassicTrainer, self).__init__(d_dim, dim1, dim2, dim_label, num_epochs, batch_size, use_gpu, validation)
+    def __init__(self, d_dim, dim1, dim2, dim_label, num_epochs, batch_size, model_path, use_gpu, validation=True):
+        super(ClassicTrainer, self).__init__(d_dim, dim1, dim2, dim_label, num_epochs, batch_size, model_path, use_gpu, validation)
         if self.use_gpu:
             self.D = ClassicNN(self.d_dim, self.dim1, self.dim2, self.dim_label).cuda()
             self.L = nn.CrossEntropyLoss().cuda()
@@ -105,7 +112,7 @@ class ClassicTrainer(BaseTrainer):
                     X = Variable(torch.FloatTensor(x))
                     Y = Variable(torch.LongTensor(y))
                 self.optimizer.zero_grad()
-                f_X = self.D(X)
+                f_X = self.D(X, mode='train')
                 loss = self.L(f_X, Y)
                 loss_val = loss.data.cpu().numpy()
                 sum_acc += (f_X.max(dim=1)[1] == Y).float().sum().data.cpu().numpy()
@@ -122,8 +129,7 @@ class ClassicTrainer(BaseTrainer):
                     else:
                         X = Variable(torch.FloatTensor(self.x_valid))
                         Y = Variable(torch.LongTensor(y_valid))
-                    outputs = self.D(X)
-                    f_X = outputs[0]
+                    f_X = self.D(X, mode='test')
                     loss = self.L(f_X, Y)
                     loss_val = loss.data.cpu().numpy()
                     valid_sum_acc += (f_X.max(dim=1)[1] == Y).float().sum().data.cpu().numpy()
@@ -141,6 +147,7 @@ class ClassicTrainer(BaseTrainer):
                     best_validate_acc = self.valid_accs[-1]
                     score = self.test()
                     f.write("Best Validated Model Prediction Accuracy = %.4f\n" % (score))
+                    self.save_model(os.path.join(self.out_path, 'best_model.ckpt'))
             else:
                 f.write("Epoch %d, time = %ds, train accuracy = %.4f, loss = %.4f, test accuracy = %.4f\n" % (
                         j, time.time() - begin, self.train_acc, self.train_loss[-1], self.test()))
@@ -149,15 +156,16 @@ class ClassicTrainer(BaseTrainer):
         if self.validation:
             f.write("Best Validated Model Prediction Accuracy = %.4f\n" % (score))
         f.write('After Training, Test Accuracy: {:0.3f}\n'.format(self.test()))
+        self.save_model(os.path.join(self.out_path, 'final_model.ckpt'))
 
 
 class ADGTrainer(BaseTrainer):
-    def __init__(self, d_dim, margin, lamb, dim1, dim2, dim_label, dim_domain, num_epochs, batch_size, use_gpu=True, validation=True):
+    def __init__(self, d_dim, margin, lamb, dim1, dim2, dim_label, dim_domain, num_epochs, batch_size, model_path, use_gpu=True, validation=True):
         #Setup network
-        super(ADGTrainer, self).__init__(d_dim, dim1, dim2, dim_label, num_epochs, batch_size, use_gpu, validation)
+        super(ADGTrainer, self).__init__(d_dim, dim1, dim2, dim_label, num_epochs, batch_size, model_path, use_gpu, validation)
         self.lamb = lamb
         self.dim_domain = dim_domain
-        self.D = DANN_Siamese(self.d_dim, self.dim1, self.dim2, self.dim_label, self.dim_domain).cuda()
+        self.D = scDGN(self.d_dim, self.dim1, self.dim2, self.dim_label, self.dim_domain).cuda()
         self.L_L = nn.CrossEntropyLoss().cuda()
         self.L_D = ContrastiveLoss(margin=margin).cuda()
         self.optimizer = optim.SGD([{'params':self.D.parameters()}], lr=1e-3, momentum=0.9, weight_decay=1e-6, nesterov=True)
@@ -187,8 +195,7 @@ class ADGTrainer(BaseTrainer):
                 Z = Variable(torch.cuda.LongTensor(z))
                 U = Variable(torch.cuda.FloatTensor(u))
                 self.optimizer.zero_grad()
-                # label_output, domain_output = self.D(X1, X2)
-                label_output, domain_output1, domain_output2 = self.D(X1, X2)
+                label_output, domain_output1, domain_output2 = self.D(X1, X2, mode='train')
                 label_loss = self.L_L(label_output, Y)
                 domain_loss = self.L_D(domain_output1, domain_output2, Z, U)
                 self.loss = label_loss + self.lamb*domain_loss
@@ -205,7 +212,7 @@ class ADGTrainer(BaseTrainer):
                 if self.validation:
                     X_v = Variable(torch.cuda.FloatTensor(x_valid1))
                     Y_v = Variable(torch.cuda.LongTensor(y_valid))
-                    label_output, _, _ = self.D(X_v, X_v)
+                    label_output = self.D(X_v, mode='test' )
                     loss = self.L_L(label_output, Y_v)
                     loss_val = loss.data.cpu().numpy()
                     valid_epoch_loss.append(loss_val)
@@ -223,6 +230,7 @@ class ADGTrainer(BaseTrainer):
                     best_validate_acc = self.valid_accs[-1]
                     score = self.test()
                     f.write("Best Validated Model Prediction Accuracy = %.4f\n" % (score))
+                    self.save_model(os.path.join(self.out_path, 'best_model.ckpt'))
             else:
                 f.write("Epoch %d, time = %ds, train accuracy = %.4f, train loss = %.4f, adv loss = %.4f, test accuracy = %.4f\n" % (
                         j, time.time() - begin, self.train_acc, self.train_loss[-1], self.adv_loss[-1], self.test()))
@@ -231,4 +239,5 @@ class ADGTrainer(BaseTrainer):
         if self.validation:
             f.write("Best Validated Model Prediction Accuracy = %.4f\n" % (score))
         f.write('After Training, Test Accuracy: {:0.3f}\n'.format(self.test()))
+        self.save_model(os.path.join(self.out_path, 'final_model.ckpt'))
 

@@ -151,8 +151,6 @@ class dataset(object):
 class dataset_DG(dataset):
     def __init__(self, data_path, batch_size, label_size, dataset_name=None, validation=True):
         super(dataset_DG, self).__init__(data_path, batch_size, label_size, dataset_name, validation)
-    def init_dataset_DG(self):
-        self.init_dataset()
         self.prepare_siamese()
         
     def prepare_siamese(self):

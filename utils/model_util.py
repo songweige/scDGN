@@ -21,16 +21,14 @@ class ClassicNN(nn.Module):
         )
         print(self)
 
-    def forward(self, x, target_layer=0):
+    def forward(self, x, mode='train'):
         h1_output = self.h1(x)
         h2_output = self.h2(h1_output)
-        output = self.o(h2_output)
-        if target_layer == 1:
-            return h1_output
-        elif target_layer == 2:
+        class_output = self.o(h2_output)
+        if mode ==  'train' or 'test':
+            return class_output
+        elif mode == 'eval':
             return h2_output
-        else:
-            return [output]
 
 class scDGN(nn.Module):
     def __init__(self, d_dim=20499, dim1=1136, dim2=100, dim_label=75, dim_domain=64):
@@ -54,15 +52,17 @@ class scDGN(nn.Module):
             nn.Linear(self.dim2, self.dim_label),
         )
         print(self)
-    def forward(self, x1, x2, target_layer=0, alpha=1):
+    def forward(self, x1, x2=None, mode='train', alpha=1):
         feature = self.feature_extractor(x1)
         reverse_feature = ReverseLayerF.apply(feature, alpha)
         class_output = self.label_classifier(feature)
-        domain_output1 = self.domain_classifier(reverse_feature)
-        feature2 = self.feature_extractor(x2)
-        reverse_feature2 = ReverseLayerF.apply(feature2, alpha)
-        domain_output2 = self.domain_classifier(reverse_feature2)
-        if target_layer == 0:
+        if mode == 'train':
+            domain_output1 = self.domain_classifier(reverse_feature)
+            feature2 = self.feature_extractor(x2)
+            reverse_feature2 = ReverseLayerF.apply(feature2, alpha)
+            domain_output2 = self.domain_classifier(reverse_feature2)
             return class_output, domain_output1, domain_output2
-        else:
+        elif mode == 'test':
+            return class_output
+        elif mode == 'eval':
             return feature
