@@ -1,4 +1,4 @@
-# Supervised Adversarial Alignment of Single-Cell RNA-seq Data
+# Supervised Adversarial Alignment of scRNA-seq Data
 
 The scDGN model aims at reducing dimensionality for scRNA data with a kind taking care of the batch effects under supervised setting using conditional adversarial domain training.
 
@@ -26,7 +26,7 @@ First, create the enviroment with Anaconda. Installing Pytorch with the other ve
   conda install pytorch=1.0.1 cuda90 -c pytorch
 ```
 
-Then download the `data/` folder from the link https://drive.google.com/drive/folders/1HUUT_g-uPHlLDnZS44CylH1i3DrawAsI?usp=sharing to directory `scDGN/data/`. 
+Then download the content of `scDGN/` folder from the link https://drive.google.com/drive/folders/1HUUT_g-uPHlLDnZS44CylH1i3DrawAsI?usp=sharing to directory `scDGN/data/`. 
 
 ## Usage
 
