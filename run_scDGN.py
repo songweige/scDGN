@@ -63,6 +63,6 @@ if __name__ == "__main__":
 
     n_labels = N_CELL_TYPES[args.dataset]
     n_genes = N_GENES[args.dataset]
-    data_path = '../processed_data'
+    data_path = 'data/'
     train(args, n_genes, n_labels, data_path)
     
