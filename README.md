@@ -18,11 +18,12 @@ Architecture of scDGN. The network includes three modules: scRNA encoder (blue),
 
 First, create the enviroment with Anaconda. Installing Pytorch with the other versions of CUDA can be found at [Pytorch document](https://pytorch.org/get-started/previous-versions/). Here PyTorch 1.0.1 and CUDA 9.0 are used:
 ```
-  mkdir scDGN scDGN/data scDGN/ckpts
-  cd scDGN
   git clone git@github.com:SongweiGe/scDGN.git
+  cd scDGN
+  mkdir scDGN/data scDGN/ckpts
   conda create -n scDGN python=3.6
   conda activate scDGN
+  conda install tqdm
   conda install pytorch=1.0.1 cuda90 -c pytorch
 ```
 
@@ -34,6 +35,7 @@ Then download the content of `scDGN/` folder from the link https://drive.google.
 Change the `-o` to whatever you want to call. Also see run_scDGN.py to adjust hyper-parameters (for example, change `l` to control the trade-off between domain invariance and classification accuracy, `dn` indicates the name of dataset, `m` represents  margin in the contrastive loss, `adv` indicates if we use scDGN or NN, use `validation` to do hyperparameters selection with a validation set.). 
 ```
 python run_scDGN.py -dn pancreas1 -l 0.1 -m 1 -g 0 -adv 0 -o pancreas1_test_NN --validation 0
+python run_scDGN.py -dn pancreas1 -l 0.1 -m 1 -g 0 -adv 1 -o pancreas1_test_CDGN --validation 0
 ```
 
 ### Evaluation

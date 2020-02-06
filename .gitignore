@@ -3,6 +3,7 @@ ckpts/
 __pycache__/
 *.py[cod]
 *$py.class
+data/
 
 # C extensions
 *.so

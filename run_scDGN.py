@@ -11,7 +11,8 @@ N_GENES = {'scquery':20499, 'pbmc':3000, 'pancreas1': 3000, 'pancreas2': 3000, '
 
 def train(args, dim_i, dim_o, data_path):
     model_path = os.path.join(args.ckpts, args.output)
-    # os.mkdir(model_path)
+    if not os.path.exists(model_path):
+        os.mkdir(model_path)
     if args.adv_flag:
         dataloader = dataset_CADG(data_path, args.batch_size, label_size=dim_o, dataset_name=args.dataset, validation=args.dataset)
         trainer = ADGTrainer(dim_i, args.margin, args.lamb, args.dim1, args.dim2, dim_o, args.dimd, args.epochs, 
